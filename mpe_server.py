@@ -55,10 +55,10 @@ class MPEServer(Protocol):
     client_name = ""
 
     def connectionMade(self):
-        print "Client connected. Total Clients: %i" % (len(MPEServer.clients) + 1)
+        print("Client connected. Total Clients: %i" % (len(MPEServer.clients) + 1))
 
     def connectionLost(self, reason):
-        print "Client disconnected"
+        print("Client disconnected")
         if MPEServer.clients[self.client_id]:
             del MPEServer.clients[self.client_id]
         if self.client_id in MPEServer.rendering_client_ids:
@@ -73,6 +73,8 @@ class MPEServer(Protocol):
     def dataReceived(self, data):
         global screens_drawn
         global framecount
+        # Parse data as utf-8, not byte string
+        data = data.decode("utf_8")
         # There may be more than 1 message in the mix
         messages = data.split("\n")
         for message in messages:
@@ -87,7 +89,7 @@ class MPEServer(Protocol):
                 # Format
                 # D|client_id|last_frame_rendered
                 if token_count != 3:
-                    print "ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens
+                    print("ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens)
                 client = int(tokens[1])
                 frame_id = int(tokens[2])
                 if frame_id >= framecount:
@@ -101,7 +103,7 @@ class MPEServer(Protocol):
                 # "S|client_id|client_name"
                 # "A|client_id|client_name|should_receive_broadcasts"
                 if token_count < 3 or token_count > 4:
-                    print "ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens
+                    print("ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens)
                 self.client_id = int(tokens[1])
                 self.client_name = tokens[2]
                 MPEServer.clients[self.client_id] = self
@@ -113,7 +115,7 @@ class MPEServer(Protocol):
                     client_receives_messages = tokens[3].lower() == 'true'
 
                 if client_receives_messages:
-                    print "New client will receive data"
+                    print("New client will receive data")
                     MPEServer.receiving_client_ids.append(self.client_id)
 
                 MPEServer.handleClientAdd(self.client_id)
@@ -123,7 +125,7 @@ class MPEServer(Protocol):
                 # "T|message message message"
                 # "T|message message message|toID_1,toID_2,toID_3"
                 if token_count < 2 or token_count > 3:
-                    print "ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens
+                    print("ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens)
                 to_client_ids = []
                 if token_count == 2:
                     to_client_ids = MPEServer.receiving_client_ids
@@ -137,23 +139,25 @@ class MPEServer(Protocol):
                 # Format:
                 # P
                 if token_count > 1:
-                    print "ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens
+                    print("ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens)
                 MPEServer.togglePause()
 
             elif cmd == CMD_RESET:
                 # Format:
                 # R
                 if token_count > 1:
-                    print "ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens
+                    print("ERROR: Incorrect param count for CMD %s. " % cmd, data, tokens)
                 MPEServer.reset()
 
             else:
-                print "Unknown message: " + message
+                print("Unknown message: " + message)
 
-        # print "Received message: ", data, "FROM", self.client_id
+        # print("Received message: ", data, "FROM", self.client_id)
 
     def sendMessage(self, message):
-        self.transport.write(message + "\n")
+        # Must use byte string, not unicode string
+        message = message + "\n"
+        self.transport.write(message.encode('utf_8'))
 
     @staticmethod
     def reset():
@@ -164,7 +168,7 @@ class MPEServer(Protocol):
         MPEServer.message_queue = []
         MPEServer.sendReset()
         if is_paused:
-            print "INFO: Reset was called when server is paused."
+            print("INFO: Reset was called when server is paused.")
         MPEServer.sendNextFrame()
 
     @staticmethod
@@ -183,16 +187,16 @@ class MPEServer(Protocol):
     def handleClientAdd(client_id):
         global framecount
         global screens_required
-        print "Added client %i (%s)" % (client_id, MPEServer.clients[client_id].client_name)
+        print("Added client %i (%s)" % (client_id, MPEServer.clients[client_id].client_name))
         num_sync_clients = len(MPEServer.rendering_client_ids)
         if screens_required == -1 or num_sync_clients == screens_required:
             # NOTE: We don't reset when an async client connects
             if client_id in MPEServer.rendering_client_ids:
                 MPEServer.reset()
         elif num_sync_clients < screens_required:
-            print "Waiting for %i more clients." % (screens_required - num_sync_clients)
+            print("Waiting for %i more clients." % (screens_required - num_sync_clients))
         elif num_sync_clients > screens_required:
-            print "ERROR: More than MAX clients have connected."
+            print("ERROR: More than MAX clients have connected.")
 
     @staticmethod
     def isNextFrameReady():
@@ -242,7 +246,7 @@ class MPEServer(Protocol):
 
     @staticmethod
     def broadcastMessage(message, from_client_id, to_client_ids):
-        #print "Broadcasting message: " + message + " to client IDs: ", to_client_ids
+        #print("Broadcasting message: " + message + " to client IDs: ", to_client_ids)
         m = BroadcastMessage(message, from_client_id, to_client_ids)
         MPEServer.message_queue.append(m)
 
@@ -256,8 +260,8 @@ MPEServer.receiving_client_ids = []
 MPEServer.message_queue = []
 
 reactor.listenTCP(portnum, factory)
-print "MPE Server started on port %i" % portnum
-print "Running at max %i FPS" % framerate
+print("MPE Server started on port %i" % portnum)
+print("Running at max %i FPS" % framerate)
 if screens_required > 0:
-    print "Waiting for %i clients." % screens_required
+    print("Waiting for %i clients." % screens_required)
 reactor.run()
