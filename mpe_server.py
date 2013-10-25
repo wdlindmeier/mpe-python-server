@@ -249,6 +249,11 @@ class MPEServer(Protocol):
         #print("Broadcasting message: " + message + " to client IDs: ", to_client_ids)
         m = BroadcastMessage(message, from_client_id, to_client_ids)
         MPEServer.message_queue.append(m)
+        # NOTE: If only async clients are connected, send this message now.
+        # Otherwise the message wont be sent until the next render frame
+        # comes across. 
+        if len(MPEServer.rendering_client_ids) == 0:
+            MPEServer.sendNextFrame()
 
 # Start the server
 factory = Factory()
